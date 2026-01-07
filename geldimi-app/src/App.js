@@ -133,7 +133,16 @@ function AdminPanel({ user, onLogout }) {
     password: '',
     branch: ''
   });
-
+const [scheduleForm, setScheduleForm] = useState({
+    sinif: '',
+    gun: '',
+    saat: '',
+    dersAdi: '',
+    ogretmenId: '',
+    ogretmenAdi: ''
+  });
+  
+  const [schedules, setSchedules] = useState([]);
   // Öğrencileri yükle
   React.useEffect(() => {
     const loadStudents = async () => {
@@ -161,7 +170,17 @@ function AdminPanel({ user, onLogout }) {
     };
     loadTeachers();
   }, [user.schoolId]);
-
+// Dersleri yükle
+  React.useEffect(() => {
+    const loadSchedules = async () => {
+      const schedulesRef = collection(db, 'schedules');
+      const q = query(schedulesRef, where('schoolId', '==', user.schoolId));
+      const snapshot = await getDocs(q);
+      const schedulesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSchedules(schedulesList);
+    };
+    loadSchedules();
+  }, [user.schoolId]);
   // Öğrenci ekle
   const addStudent = async () => {
     if (!studentForm.name || !studentForm.class || !studentForm.no) {
@@ -217,6 +236,53 @@ function AdminPanel({ user, onLogout }) {
       setLoading(false);
     }
   };
+// Ders ekle
+  const addSchedule = async () => {
+    if (!scheduleForm.sinif || !scheduleForm.gun || !scheduleForm.saat || !scheduleForm.dersAdi || !scheduleForm.ogretmenId) {
+      alert('Lütfen tüm alanları doldurun!');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'schedules'), {
+        ...scheduleForm,
+        schoolId: user.schoolId,
+        createdAt: new Date()
+      });
+
+      alert('✅ Ders başarıyla eklendi!');
+      setScheduleForm({ sinif: '', gun: '', saat: '', dersAdi: '', ogretmenId: '', ogretmenAdi: '' });
+      
+      // Listeyi yenile
+      const schedulesRef = collection(db, 'schedules');
+      const q = query(schedulesRef, where('schoolId', '==', user.schoolId));
+      const snapshot = await getDocs(q);
+      const schedulesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSchedules(schedulesList);
+    } catch (error) {
+      alert('❌ Hata: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  // Ders sil
+  const deleteSchedule = async (scheduleId) => {
+    if (!window.confirm('Bu dersi silmek istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, 'schedules', scheduleId));
+      alert('✅ Ders silindi!');
+      setSchedules(schedules.filter(s => s.id !== scheduleId));
+    } catch (error) {
+      alert('❌ Hata: ' + error.message);
+    }
+    setLoading(false);
+  };
+ 
 
   // Öğretmen ekle
   const addTeacher = async () => {
@@ -328,6 +394,12 @@ function AdminPanel({ user, onLogout }) {
                 style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', padding: '30px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(240,147,251,0.3)' }}
               >
                 👨‍🏫 Öğretmen Yönetimi
+              </button>
+              <button 
+                onClick={() => setCurrentPage('schedule')}
+                style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '30px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(102,126,234,0.3)', width: '100%', marginTop: '20px' }}
+              >
+                📅 Ders Programı
               </button>
             </div>
           </div>
@@ -635,7 +707,148 @@ function AdminPanel({ user, onLogout }) {
       </div>
     );
   }
-
+// Ders Programı Sayfası
+  if (currentPage === 'schedule') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <div style={{ padding: '20px' }}>
+          <button onClick={onLogout} style={{ background: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
+            🚪 Çıkış Yap
+          </button>
+          
+          <div style={{ maxWidth: '1200px', margin: '40px auto', background: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+            <h2 style={{ fontSize: '32px', marginBottom: '30px', color: '#667eea' }}>📅 Ders Programı Yönetimi</h2>
+            {/* Ders Ekleme Formu */}
+            <div style={{ marginBottom: '40px', padding: '30px', background: '#f8f9fa', borderRadius: '15px' }}>
+              <h3 style={{ fontSize: '24px', marginBottom: '20px', color: '#667eea' }}>➕ Yeni Ders Ekle</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Sınıf</label>
+                  <input 
+  type="text" 
+  placeholder="Örn: 9A"
+  value={scheduleForm.sinif}
+  onChange={(e) => setScheduleForm({...scheduleForm, sinif: e.target.value})}
+  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #e0e0e0', fontSize: '16px' }}
+/>
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Gün</label>
+                 <select 
+  value={scheduleForm.gun}
+  onChange={(e) => setScheduleForm({...scheduleForm, gun: e.target.value})}
+  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #e0e0e0', fontSize: '16px' }}
+>
+                    <option value="">Seçiniz</option>
+                    <option value="Pazartesi">Pazartesi</option>
+                    <option value="Salı">Salı</option>
+                    <option value="Çarşamba">Çarşamba</option>
+                    <option value="Perşembe">Perşembe</option>
+                    <option value="Cuma">Cuma</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Saat</label>
+                  <input 
+                    type="text" 
+                  value={scheduleForm.saat}
+onChange={(e) => setScheduleForm({...scheduleForm, saat: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #e0e0e0', fontSize: '16px' }}
+                  />
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Ders Adı</label>
+                  <input 
+                    type="text" 
+                   value={scheduleForm.dersAdi}
+onChange={(e) => setScheduleForm({...scheduleForm, dersAdi: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #e0e0e0', fontSize: '16px' }}
+                  />
+                </div>
+                
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Öğretmen</label>
+                  <select 
+  value={scheduleForm.ogretmenId}
+  onChange={(e) => {
+    const selectedTeacher = teachers.find(t => t.id === e.target.value);
+    setScheduleForm({
+      ...scheduleForm, 
+      ogretmenId: e.target.value,
+      ogretmenAdi: selectedTeacher ? selectedTeacher.name : ''
+    });
+  }}
+  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #e0e0e0', fontSize: '16px' }}
+>
+  <option value="">Öğretmen Seçiniz</option>
+  {teachers.map(teacher => (
+    <option key={teacher.id} value={teacher.id}>{teacher.name} - {teacher.branch}</option>
+  ))}
+</select>
+                </div>
+              </div>
+              
+              <button 
+  type="button"
+  onClick={addSchedule}
+  disabled={loading}
+  style={{ marginTop: '20px', background: loading ? '#ccc' : '#667eea', color: 'white', padding: '15px 40px', borderRadius: '10px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+>
+  {loading ? '⏳ Kaydediliyor...' : '💾 Dersi Kaydet'}
+</button>
+            </div>
+            
+            {/* Ders Listesi */}
+            <div>
+              <h3 style={{ fontSize: '24px', marginBottom: '20px', color: '#667eea' }}>📋 Kayıtlı Dersler</h3>
+{schedules.length === 0 ? (
+                <p style={{ color: '#999' }}>Henüz ders eklenmedi.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+                    <thead>
+                      <tr style={{ background: '#667eea', color: 'white' }}>
+                        <th style={{ padding: '15px', textAlign: 'left' }}>Sınıf</th>
+                        <th style={{ padding: '15px', textAlign: 'left' }}>Gün</th>
+                        <th style={{ padding: '15px', textAlign: 'left' }}>Saat</th>
+                        <th style={{ padding: '15px', textAlign: 'left' }}>Ders</th>
+                        <th style={{ padding: '15px', textAlign: 'left' }}>Öğretmen</th>
+                        <th style={{ padding: '15px', textAlign: 'center' }}>İşlem</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedules.map(schedule => (
+                        <tr key={schedule.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                          <td style={{ padding: '15px' }}>{schedule.sinif}</td>
+                          <td style={{ padding: '15px' }}>{schedule.gun}</td>
+                          <td style={{ padding: '15px' }}>{schedule.saat}</td>
+                          <td style={{ padding: '15px' }}>{schedule.dersAdi}</td>
+                          <td style={{ padding: '15px' }}>{schedule.ogretmenAdi}</td>
+                          <td style={{ padding: '15px', textAlign: 'center' }}>
+                            <button 
+  onClick={() => deleteSchedule(schedule.id)}
+  style={{ background: '#ff4757', color: 'white', padding: '8px 15px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+>
+  🗑️ Sil
+</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    );
+  }
   return null;
 }
 
