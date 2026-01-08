@@ -397,9 +397,16 @@ const [scheduleForm, setScheduleForm] = useState({
               </button>
               <button 
                 onClick={() => setCurrentPage('schedule')}
-                style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '30px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(102,126,234,0.3)', width: '100%', marginTop: '20px' }}
+             style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '30px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(102,126,234,0.3)', width: '100%', marginTop: '20px' }}
               >
                 📅 Ders Programı
+              </button>
+
+              <button 
+                onClick={() => setCurrentPage('reports')}
+                style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', color: 'white', padding: '30px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(250,112,154,0.3)', width: '100%', marginTop: '20px' }}
+              >
+                📊 Raporlar ve İstatistikler
               </button>
             </div>
           </div>
@@ -708,7 +715,67 @@ const [scheduleForm, setScheduleForm] = useState({
     );
   }
 // Ders Programı Sayfası
-  if (currentPage === 'schedule') {
+ if (currentPage === 'schedule') {
+  }
+  if (currentPage === 'reports') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
+        <div style={{ padding: '20px' }}>
+          <button onClick={onLogout} style={{ background: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
+            🚪 Çıkış Yap
+          </button>
+          
+          <div style={{ maxWidth: '1200px', margin: '40px auto', background: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+            <h2 style={{ fontSize: '32px', marginBottom: '30px', color: '#fa709a' }}>📊 Raporlar ve İstatistikler</h2>
+            
+           {/* İstatistik Kartları */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '40px' }}>
+              <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '30px', borderRadius: '15px', color: 'white', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '48px', margin: '0 0 10px 0' }}>{students.length}</h3>
+                <p style={{ fontSize: '18px', margin: 0 }}>👨‍🎓 Toplam Öğrenci</p>
+              </div>
+              
+              <div style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', padding: '30px', borderRadius: '15px', color: 'white', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '48px', margin: '0 0 10px 0' }}>{teachers.length}</h3>
+                <p style={{ fontSize: '18px', margin: 0 }}>👨‍🏫 Toplam Öğretmen</p>
+              </div>
+              
+              <div style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', padding: '30px', borderRadius: '15px', color: 'white', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '48px', margin: '0 0 10px 0' }}>{schedules.length}</h3>
+                <p style={{ fontSize: '18px', margin: 0 }}>📅 Toplam Ders</p>
+              </div>
+            </div>
+
+            {/* Sınıf Bazlı İstatistikler */}
+            <div style={{ marginTop: '40px' }}>
+              <h3 style={{ fontSize: '24px', marginBottom: '20px', color: '#fa709a' }}>👥 Sınıf Bazlı Öğrenci Dağılımı</h3>
+              <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '15px' }}>
+                {(() => {
+                  const classCounts = {};
+                  students.forEach(student => {
+                    classCounts[student.class] = (classCounts[student.class] || 0) + 1;
+                  });
+                  
+                  return Object.keys(classCounts).length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                      {Object.entries(classCounts).map(([className, count]) => (
+                        <div key={className} style={{ background: 'white', padding: '20px', borderRadius: '10px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                          <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#667eea', margin: '0 0 5px 0' }}>{count}</p>
+                          <p style={{ fontSize: '16px', color: '#666', margin: 0 }}>Sınıf {className}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: '#999', textAlign: 'center' }}>Henüz öğrenci eklenmedi.</p>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
         <div style={{ padding: '20px' }}>
@@ -848,7 +915,7 @@ onChange={(e) => setScheduleForm({...scheduleForm, dersAdi: e.target.value})}
         </div>
       </div>
     );
-  }
+ 
   return null;
 }
 
