@@ -176,11 +176,13 @@ const [scheduleForm, setScheduleForm] = useState({
       const schedulesRef = collection(db, 'schedules');
       const q = query(schedulesRef, where('schoolId', '==', user.schoolId));
       const snapshot = await getDocs(q);
-      const schedulesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSchedules(schedulesList);
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('Veli - Yüklenen dersler:', list);
+      console.log('Öğrenci sınıfı:', students[0]?.class);
+      setSchedules(list);
     };
     loadSchedules();
-  }, [user.schoolId]);
+  }, [user.schoolId, students]);
   // Öğrenci ekle
   const addStudent = async () => {
     if (!studentForm.name || !studentForm.class || !studentForm.no) {
@@ -931,6 +933,9 @@ function TeacherPanel({ user, onLogout }) {
   const [homeworkList, setHomeworkList] = useState([]);
   const [selectedHomework, setSelectedHomework] = useState(null);
   const [homeworkStatus, setHomeworkStatus] = useState({});
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
+  const [expandedClass, setExpandedClass] = useState(null);
+const [schedules, setSchedules] = useState([]);
 
   // Öğrencileri yükle
   React.useEffect(() => {
@@ -959,6 +964,47 @@ function TeacherPanel({ user, onLogout }) {
     };
     loadHomework();
   }, [user.schoolId, user.uid]);
+
+
+  // Dersleri yükle (sadece bu öğretmene ait)
+  React.useEffect(() => {
+    const loadSchedules = async () => {
+      const schedulesRef = collection(db, 'schedules');
+      const q = query(
+        schedulesRef, 
+        where('schoolId', '==', user.schoolId),
+        where('ogretmenId', '==', user.uid)
+      );
+      const snapshot = await getDocs(q);
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSchedules(list);
+    };
+    loadSchedules();
+  }, [user.schoolId, user.uid]);
+  // Yoklama geçmişini yükle
+  React.useEffect(() => {
+    const loadAttendanceHistory = async () => {
+      const attendanceRef = collection(db, 'attendance');
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      
+      const q = query(
+        attendanceRef,
+        where('teacherId', '==', user.uid),
+        where('schoolId', '==', user.schoolId)
+      );
+      const snapshot = await getDocs(q);
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Son 2 hafta filtrele ve sırala
+      const filtered = list
+        .filter(record => new Date(record.date) >= twoWeeksAgo)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      setAttendanceHistory(filtered);
+    };
+    loadAttendanceHistory();
+  }, [user.uid, user.schoolId]);
 
   const handleAttendance = (studentId, status) => {
     setAttendance(prev => ({ ...prev, [studentId]: status }));
@@ -1128,7 +1174,7 @@ function TeacherPanel({ user, onLogout }) {
             <p>{students.length} öğrenci • {homeworkList.length} ödev</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             <button 
               onClick={() => setCurrentPage('attendance')}
               style={{ background: 'white', padding: '40px', borderRadius: '15px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
@@ -1144,6 +1190,187 @@ function TeacherPanel({ user, onLogout }) {
               <div style={{ fontSize: '48px', marginBottom: '15px' }}>📚</div>
               <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#2d3748' }}>Ödev İşlemleri</div>
             </button>
+            <button 
+              onClick={() => setCurrentPage('mySchedule')}
+              style={{ background: 'white', padding: '40px', borderRadius: '15px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+            >
+              <div style={{ fontSize: '48px', marginBottom: '15px' }}>📅</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#2d3748' }}>Ders Programım</div>
+            </button>
+            <button 
+              onClick={() => setCurrentPage('attendanceHistory')}
+              style={{ background: 'white', padding: '40px', borderRadius: '15px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+            >
+              <div style={{ fontSize: '48px', marginBottom: '15px' }}>📋</div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#2d3748' }}>Yoklama Geçmişi</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+// Ders Programım Sayfası
+  if (currentPage === 'mySchedule') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f7fafc', padding: '20px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '15px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>📅 Ders Programım</h1>
+            <button onClick={() => setCurrentPage('home')} style={{ background: '#e2e8f0', color: '#2d3748', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+              ← Geri
+            </button>
+          </div>
+
+          <div style={{ background: 'white', borderRadius: '15px', padding: '30px' }}>
+            {schedules.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#718096' }}>
+                <div style={{ fontSize: '48px', marginBottom: '15px' }}>📅</div>
+                <p>Henüz ders programı oluşturulmamış.</p>
+              </div>
+            ) : (
+              <div>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px' }}>Derslerim</h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f7fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Gün</th>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Saat</th>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Ders</th>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold' }}>Sınıf</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedules.map(schedule => (
+                        <tr key={schedule.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '15px' }}>{schedule.gun}</td>
+                          <td style={{ padding: '15px' }}>{schedule.saat}</td>
+                          <td style={{ padding: '15px' }}>{schedule.dersAdi}</td>
+                          <td style={{ padding: '15px' }}>{schedule.sinif}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // Yoklama Geçmişi Sayfası
+  if (currentPage === 'attendanceHistory') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f7fafc', padding: '20px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{ background: 'white', padding: '30px', borderRadius: '15px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>📋 Yoklama Geçmişi (Son 2 Hafta)</h1>
+            <button onClick={() => setCurrentPage('home')} style={{ background: '#e2e8f0', color: '#2d3748', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+              ← Geri
+            </button>
+          </div>
+
+          <div style={{ background: 'white', borderRadius: '15px', padding: '30px' }}>
+            {attendanceHistory.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#718096' }}>
+                <div style={{ fontSize: '48px', marginBottom: '15px' }}>📋</div>
+                <p>Son 2 haftada yoklama kaydı bulunamadı.</p>
+              </div>
+            ) : (
+              <div>
+                {(() => {
+                  // Sınıf bazlı gruplama
+                  const groupedByClass = attendanceHistory.reduce((acc, record) => {
+                    if (!acc[record.class]) {
+                      acc[record.class] = [];
+                    }
+                    acc[record.class].push(record);
+                    return acc;
+                  }, {});
+
+                  return (
+                    <div style={{ display: 'grid', gap: '15px' }}>
+                      {Object.entries(groupedByClass).map(([className, records]) => (
+                        <div key={className} style={{ border: '2px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                          {/* Sınıf Başlığı */}
+                          <button
+                            onClick={() => setExpandedClass(expandedClass === className ? null : className)}
+                            style={{
+                              width: '100%',
+                              padding: '20px',
+                              background: expandedClass === className ? '#667eea' : 'white',
+                              color: expandedClass === className ? 'white' : '#2d3748',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              fontWeight: 'bold',
+                              fontSize: '18px'
+                            }}
+                          >
+                            <span>🎓 {className} Sınıfı</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                              <span style={{ fontSize: '14px', opacity: 0.8 }}>
+                                {records.length} yoklama
+                              </span>
+                              <span style={{ fontSize: '20px' }}>
+                                {expandedClass === className ? '▼' : '▶'}
+                              </span>
+                            </div>
+                          </button>
+
+                          {/* Açılır Liste */}
+                          {expandedClass === className && (
+                            <div style={{ padding: '15px', background: '#f7fafc' }}>
+                              {records.map((record) => (
+                                <div 
+                                  key={record.id}
+                                  style={{
+                                    padding: '15px',
+                                    background: 'white',
+                                    borderRadius: '8px',
+                                    marginBottom: '10px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    gap: '10px'
+                                  }}
+                                >
+                                  <div style={{ flex: '1', minWidth: '150px' }}>
+                                    <p style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '3px' }}>
+                                      {record.studentName}
+                                    </p>
+                                    <p style={{ fontSize: '13px', color: '#718096' }}>
+                                      📅 {new Date(record.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                                    </p>
+                                  </div>
+                                  <div style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '6px',
+                                    fontWeight: '600',
+                                    fontSize: '14px',
+                                    background: record.status === 'present' ? '#c6f6d5' : 
+                                              record.status === 'late' ? '#feebc8' : '#fed7d7',
+                                    color: record.status === 'present' ? '#22543d' : 
+                                           record.status === 'late' ? '#7c2d12' : '#742a2a'
+                                  }}>
+                                    {record.status === 'present' ? '✓ Geldi' : 
+                                     record.status === 'late' ? '⏰ Geç' : '✗ Gelmedi'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1479,8 +1706,10 @@ function ParentPanel({ user, onLogout }) {
   const [homeworkData, setHomeworkData] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'homework', 'notifications'
-
+ const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'homework', 'notifications'
+  const [schedules, setSchedules] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  
   React.useEffect(() => {
     const loadData = async () => {
       try {
@@ -1495,6 +1724,7 @@ function ParentPanel({ user, onLogout }) {
         setStudents(studentsList);
 
         if (studentsList.length > 0) {
+          setSelectedStudent(studentsList[0]);
           const studentIds = studentsList.map(s => s.id);
           
           // Yoklamaları çek
@@ -1540,6 +1770,20 @@ function ParentPanel({ user, onLogout }) {
     loadData();
   }, [user.uid]);
 
+// Dersleri yükle
+  React.useEffect(() => {
+    const loadSchedules = async () => {
+      const schedulesRef = collection(db, 'schedules');
+      const q = query(schedulesRef, where('schoolId', '==', user.schoolId));
+      const snapshot = await getDocs(q);
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('Veli - Yüklenen dersler:', list);
+      console.log('Öğrenci sınıfı:', students[0]?.class);
+      setSchedules(list);
+    };
+    loadSchedules();
+ }, [user.schoolId, students]);
+
   const getStatusColor = (status) => {
     if (status === 'present' || status === 'done') return { bg: '#c6f6d5', border: '#48bb78', text: '#22543d' };
     if (status === 'late') return { bg: '#feebc8', border: '#ed8936', text: '#7c2d12' };
@@ -1573,11 +1817,26 @@ function ParentPanel({ user, onLogout }) {
           <div>
             <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>Veli Paneli</h1>
             <p style={{ color: '#718096' }}>{user.name}</p>
-            {students.map(student => (
-              <p key={student.id} style={{ fontSize: '14px', color: '#667eea', fontWeight: '600' }}>
-                {student.name} - {student.class}
-              </p>
-            ))}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+  {students.map(student => (
+    <button
+      key={student.id}
+      onClick={() => setSelectedStudent(student)}
+      style={{
+        padding: '8px 15px',
+        borderRadius: '8px',
+        border: selectedStudent?.id === student.id ? '2px solid #667eea' : '2px solid #e2e8f0',
+        background: selectedStudent?.id === student.id ? '#667eea' : 'white',
+        color: selectedStudent?.id === student.id ? 'white' : '#2d3748',
+        fontWeight: '600',
+        cursor: 'pointer',
+        fontSize: '14px'
+      }}
+    >
+      {student.name} - {student.class}
+    </button>
+  ))}
+</div>
           </div>
           <button onClick={onLogout} style={{ background: '#f56565', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
             Çıkış
@@ -1662,6 +1921,21 @@ function ParentPanel({ user, onLogout }) {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('schedule')}
+            style={{
+              flex: 1,
+              padding: '15px',
+              borderRadius: '10px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              background: activeTab === 'schedule' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f7fafc',
+              color: activeTab === 'schedule' ? 'white' : '#4a5568'
+            }}
+          >
+            📅 Ders Programı
+          </button>
         </div>
 
         {/* Yoklama Sekmesi */}
@@ -1680,7 +1954,10 @@ function ParentPanel({ user, onLogout }) {
                 <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px', color: '#2d3748' }}>
                   Yoklama Geçmişi
                 </h3>
-                {attendanceData.map((record, index) => {
+                {attendanceData
+  .filter(record => record.studentId === selectedStudent?.id)
+  .slice(0, 14) // Son 14 kayıt = 2 hafta
+  .map((record, index) => {
                   const colors = getStatusColor(record.status);
                   return (
                     <div 
@@ -1741,7 +2018,9 @@ function ParentPanel({ user, onLogout }) {
                 <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px', color: '#2d3748' }}>
                   Ödev Durumları
                 </h3>
-                {homeworkData.map((record, index) => {
+                {homeworkData
+  .filter(record => record.studentId === selectedStudent?.id)
+  .map((record, index) => {
                   const colors = getStatusColor(record.status);
                   return (
                     <div 
@@ -1787,7 +2066,56 @@ function ParentPanel({ user, onLogout }) {
             )}
           </div>
         )}
+{/* Ders Programı Sekmesi */}
+        {activeTab === 'schedule' && (
+          <div style={{ background: 'white', borderRadius: '15px', padding: '30px' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px', color: '#10b981' }}>
+              📅 {selectedStudent?.class} Sınıfı Ders Programı ({selectedStudent?.name})
+            </h3>
+            
+            {(() => {
+            const classSchedules = schedules.filter(s => {
+ const studentClass = selectedStudent?.class?.replace('-', ''); // "5-A" -> "5A"
+  const scheduleClass = s.sinif?.replace('-', ''); // Zaten "5A" ama garantiye alıyoruz
+  return scheduleClass === studentClass;
+});
+              
+              if (classSchedules.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#718096' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '15px' }}>📅</div>
+                    <p>Henüz ders programı oluşturulmamış.</p>
+                  </div>
+                );
+              }
 
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f0fdf4', borderBottom: '2px solid #d1fae5' }}>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold', color: '#065f46' }}>Gün</th>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold', color: '#065f46' }}>Saat</th>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold', color: '#065f46' }}>Ders</th>
+                        <th style={{ padding: '15px', textAlign: 'left', fontWeight: 'bold', color: '#065f46' }}>Öğretmen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classSchedules.map(schedule => (
+                        <tr key={schedule.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '15px' }}>{schedule.gun}</td>
+                          <td style={{ padding: '15px' }}>{schedule.saat}</td>
+                          <td style={{ padding: '15px', fontWeight: '600' }}>{schedule.dersAdi}</td>
+                          <td style={{ padding: '15px', color: '#6b7280' }}>{schedule.ogretmenAdi}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </div>
+        )}
         {/* Bildirimler Sekmesi */}
         {activeTab === 'notifications' && (
           <div>
